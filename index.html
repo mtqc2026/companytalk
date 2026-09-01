@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>업무용 메신저</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="theme-color" content="#0a6cff" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="메신저" />
+<meta name="mobile-web-app-capable" content="yes" />
+<style>
+:root {
+  --accent: #0a6cff;
+  --accent-dark: #0850c4;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #1a1d21;
+  --text-dim: #6b7280;
+  --border: #e3e5e8;
+  --danger: #e0393e;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+.hidden { display: none !important; }
+.screen { height: 100dvh; width: 100%; display: flex; flex-direction: column; }
+
+/* 로그인 */
+#loginScreen { align-items: center; justify-content: center; background: linear-gradient(160deg, #0a6cff 0%, #0b4fb8 100%); }
+.login-box { background: var(--surface); padding: 36px 28px; border-radius: 16px; width: min(340px, 88vw); text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
+.login-box h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.subtitle { color: var(--text-dim); margin: 0 0 24px; font-size: 14px; }
+.login-box input { width: 100%; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--border); font-size: 15px; margin-bottom: 12px; outline: none; }
+.login-box input:focus { border-color: var(--accent); }
+.login-box button { width: 100%; padding: 13px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.login-box button:active { background: var(--accent-dark); }
+.login-box button:disabled { opacity: 0.6; }
+.error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 10px 0 0; }
+.status-line { color: var(--text-dim); font-size: 12.5px; min-height: 18px; margin: 6px 0 0; }
+
+/* 메인 */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.topbar .left, .topbar .right { display: flex; align-items: center; gap: 8px; }
+.small-icon-btn { width: 30px; height: 30px; font-size: 14px; }
+.my-nick { font-weight: 700; font-size: 15px; }
+.room-tag { font-size: 12px; color: var(--text-dim); background: var(--bg); padding: 3px 8px; border-radius: 8px; }
+.role-tag { font-size: 11px; color: var(--accent); font-weight: 700; }
+
+.user-strip { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.user-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 12px; background: var(--bg); border-radius: 999px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+.user-chip button { border: none; background: var(--accent); color: #fff; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 12px; line-height: 1; }
+.user-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; flex-shrink: 0; }
+
+.chat-log { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.msg-row { display: flex; flex-direction: column; max-width: 78%; }
+.msg-row.me { align-self: flex-end; align-items: flex-end; }
+.msg-row.other { align-self: flex-start; align-items: flex-start; }
+.msg-sender { font-size: 11px; color: var(--text-dim); margin-bottom: 3px; padding: 0 4px; }
+.msg-bubble { padding: 9px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+.msg-row.me .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.msg-row.other .msg-bubble { background: #fff; border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.msg-time { font-size: 10px; color: var(--text-dim); margin-top: 3px; padding: 0 4px; }
+.msg-img { max-width: 220px; max-height: 260px; border-radius: 12px; cursor: pointer; display: block; }
+.msg-file { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; background: #fff; border: 1px solid var(--border); cursor: pointer; font-size: 13.5px; }
+.msg-row.me .msg-file { background: rgba(255,255,255,0.15); border-color: transparent; color: #fff; }
+.system-msg { align-self: center; color: var(--text-dim); font-size: 12px; padding: 4px 10px; }
+
+.composer { display: flex; align-items: center; gap: 6px; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+.composer input[type="text"] { flex: 1; padding: 11px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); font-size: 14.5px; outline: none; }
+.composer input[type="text"]:focus { border-color: var(--accent); }
+.icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--bg); font-size: 17px; cursor: pointer; flex-shrink: 0; }
+#sendBtn { background: var(--accent); color: #fff; }
+
+/* 모달 */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-box { background: var(--surface); padding: 28px 24px; border-radius: 16px; width: min(300px, 85vw); text-align: center; }
+.modal-box p { font-size: 15px; margin: 0 0 20px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions button, #cancelCallBtn { flex: 1; padding: 11px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-accept { background: #2ecc71; color: #fff; }
+.btn-reject { background: var(--danger); color: #fff; }
+
+/* 잠금 화면 */
+.lock-overlay { z-index: 60; background: rgba(10, 12, 16, 0.92); }
+.lock-overlay .modal-box input {
+  width: 100%; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--border);
+  font-size: 15px; margin: 14px 0 4px; outline: none; text-align: center; letter-spacing: 2px;
+}
+.lock-overlay .modal-box button {
+  width: 100%; padding: 13px; border-radius: 10px; border: none; background: var(--accent);
+  color: #fff; font-weight: 600; font-size: 15px; cursor: pointer; margin-top: 8px;
+}
+
+/* 화상통화 */
+#callScreen { position: fixed; inset: 0; background: #111; z-index: 40; }
+#remoteVideo { width: 100%; height: 100%; object-fit: cover; background: #000; cursor: pointer; }
+#localVideo { position: absolute; top: 16px; right: 16px; width: 100px; height: 140px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,0.5); background: #000; transform: scaleX(-1); cursor: pointer; z-index: 2; }
+
+/* 셀프뷰를 클릭하면 큰 화면과 작은 화면(PIP)이 서로 바뀜 */
+#callScreen.swapped #remoteVideo { position: absolute; top: 16px; right: 16px; width: 100px; height: 140px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.5); z-index: 2; }
+#callScreen.swapped #localVideo { position: absolute; inset: 0; top: auto; right: auto; width: 100%; height: 100%; border-radius: 0; border: none; z-index: 1; }
+.call-controls { position: absolute; bottom: calc(28px + env(safe-area-inset-bottom)); left: 0; right: 0; display: flex; justify-content: center; gap: 18px; }
+.call-btn { width: 56px; height: 56px; border-radius: 50%; border: none; background: rgba(255,255,255,0.18); color: #fff; font-size: 22px; cursor: pointer; backdrop-filter: blur(6px); }
+.call-btn.off { background: rgba(255,255,255,0.5); }
+.call-btn.hangup { background: var(--danger); }
+
+@media (min-width: 820px) {
+  #mainScreen { max-width: 900px; margin: 0 auto; height: 100dvh; box-shadow: 0 0 0 1px var(--border); }
+  #localVideo { width: 160px; height: 220px; }
+  #callScreen.swapped #remoteVideo { width: 160px; height: 220px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="loginScreen" class="screen">
+  <div class="login-box">
+    <h1>업무용 메신저</h1>
+    <p class="subtitle">서버 설치 없이 브라우저만으로 채팅 + 화상통화</p>
+    <input id="roomInput" type="text" placeholder="방 이름 (같은 이름끼리 연결됨)" maxlength="30" />
+    <input id="nickInput" type="text" placeholder="닉네임" maxlength="20" />
+    <input id="pwInput" type="password" placeholder="방 비밀번호 (방을 처음 만들 때 설정됨)" maxlength="30" />
+    <button id="connectBtn">입장</button>
+    <p id="statusLine" class="status-line"></p>
+    <p id="loginError" class="error"></p>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="mainScreen" class="screen hidden">
+  <header class="topbar">
+    <div class="left">
+      <span id="myNick" class="my-nick"></span>
+      <span id="roleTag" class="role-tag"></span>
+    </div>
+    <div class="right">
+      <span id="roomTag" class="room-tag"></span>
+      <button id="lockBtn" class="icon-btn small-icon-btn" title="화면 잠금">🔒</button>
+    </div>
+  </header>
+
+  <div class="user-strip" id="userStrip"></div>
+  <main id="chatLog" class="chat-log"></main>
+
+  <footer class="composer">
+    <input id="msgInput" type="text" placeholder="메시지를 입력하세요" autocomplete="off" />
+    <button id="sendBtn" class="icon-btn" title="전송">➤</button>
+    <label class="icon-btn" title="이미지 전송">🖼️<input id="imageInput" type="file" accept="image/*" hidden /></label>
+    <label class="icon-btn" title="파일 전송">📎<input id="fileInput" type="file" hidden /></label>
+  </footer>
+</div>
+
+<!-- 수신 통화 -->
+<div id="incomingCallModal" class="modal hidden">
+  <div class="modal-box">
+    <p id="incomingCallText">전화가 왔습니다</p>
+    <div class="modal-actions">
+      <button id="acceptCallBtn" class="btn-accept">받기</button>
+      <button id="rejectCallBtn" class="btn-reject">거절</button>
+    </div>
+  </div>
+</div>
+
+<!-- 발신 중 -->
+<div id="callingModal" class="modal hidden">
+  <div class="modal-box">
+    <p id="callingText">연결 중...</p>
+    <button id="cancelCallBtn" class="btn-reject">취소</button>
+  </div>
+</div>
+
+<!-- 화상통화 화면 -->
+<div id="callScreen" class="screen hidden">
+  <video id="remoteVideo" autoplay playsinline></video>
+  <video id="localVideo" autoplay playsinline muted></video>
+  <div class="call-controls">
+    <button id="toggleMicBtn" class="call-btn">🎤</button>
+    <button id="toggleCamBtn" class="call-btn">📷</button>
+    <button id="pipBtn" class="call-btn" title="작은 화면(PIP)으로 보기">🗗</button>
+    <button id="hangupBtn" class="call-btn hangup">📞</button>
+  </div>
+</div>
+
+<!-- 자리비움 잠금 화면 -->
+<div id="lockOverlay" class="modal hidden lock-overlay">
+  <div class="modal-box">
+    <p>🔒 화면이 잠겼습니다</p>
+    <input id="lockPinField" type="password" placeholder="PIN 입력" autocomplete="off" />
+    <p id="lockError" class="error"></p>
+    <button id="unlockBtn">잠금 해제</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+// =====================================================================
+// 업무용 메신저 - 단일 HTML 파일 (PeerJS 무료 공용 서버 사용, 자체 서버 불필요)
+//
+// 동작 원리:
+//  - "방 이름"으로부터 결정되는 고유 ID를 가진 사람이 자동으로 "방장" 역할을 맡음
+//  - 방장은 채팅 메시지를 접속자 전체에게 중계(relay)함
+//  - 화상통화는 방장을 거치지 않고 두 사람이 PeerJS를 통해 직접 P2P 연결됨
+//  - 방장이 나가면, 남은 사람 중 한 명이 자동으로 새 방장이 되도록 재시도함
+// =====================================================================
+
+const $ = (id) => document.getElementById(id);
+
+// ---------------- DOM ----------------
+const loginScreen = $('loginScreen');
+const mainScreen = $('mainScreen');
+const callScreen = $('callScreen');
+const roomInput = $('roomInput');
+const nickInput = $('nickInput');
+const pwInput = $('pwInput');
+const connectBtn = $('connectBtn');
+const loginError = $('loginError');
+const statusLine = $('statusLine');
+const myNickEl = $('myNick');
+const roleTag = $('roleTag');
+const roomTag = $('roomTag');
+const userStrip = $('userStrip');
+const chatLog = $('chatLog');
+const msgInput = $('msgInput');
+const sendBtn = $('sendBtn');
+const imageInput = $('imageInput');
+const fileInput = $('fileInput');
+
+const incomingCallModal = $('incomingCallModal');
+const incomingCallText = $('incomingCallText');
+const acceptCallBtn = $('acceptCallBtn');
+const rejectCallBtn = $('rejectCallBtn');
+const callingModal = $('callingModal');
+const callingText = $('callingText');
+const cancelCallBtn = $('cancelCallBtn');
+
+const remoteVideo = $('remoteVideo');
+const localVideo = $('localVideo');
+const toggleMicBtn = $('toggleMicBtn');
+const toggleCamBtn = $('toggleCamBtn');
+const pipBtn = $('pipBtn');
+const hangupBtn = $('hangupBtn');
+
+const lockBtn = $('lockBtn');
+const lockOverlay = $('lockOverlay');
+const lockPinField = $('lockPinField');
+const lockError = $('lockError');
+const unlockBtn = $('unlockBtn');
+
+// ---------------- 상태 ----------------
+let peer = null;
+let myPeerId = null;
+let myNick = null;
+let roomName = null;
+let myRoomPassword = '';       // 로그인 시 입력한 비밀번호 (평문은 저장만, 전송은 해시로)
+let hostPasswordHash = null;   // (방장일 때) 이 방에 필요한 비밀번호 해시. null이면 비밀번호 없음
+let isHost = false;
+
+let hostConn = null;           // (클라이언트일 때) 방장과의 데이터 연결
+const clientConns = new Map(); // (방장일 때) peerId -> {conn, nick}
+let onlineUsers = new Map();   // peerId -> nick  (모두가 공통으로 유지하는 로컬 캐시)
+
+let localStream = null;
+let currentCall = null;        // PeerJS MediaConnection
+let currentPeerName = null;
+let incomingCall = null;       // 수신 대기 중인 MediaConnection
+let micOn = true;
+let camOn = true;
+
+// ---------------- 유틸 ----------------
+function slug(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+function hostIdFor(room) { return 'msghost' + slug(room.trim().toLowerCase()); }
+function randomClientId(room, nick) {
+  return 'msgu' + slug(room + nick + Date.now() + Math.random());
+}
+function nowStr() {
+  return new Date().toLocaleTimeString('ko-KR', { hour12: false });
+}
+
+// 비밀번호를 그대로 주고받지 않고 SHA-256 해시로 비교 (HTTPS/localhost에서만 동작)
+async function hashText(str) {
+  if (!window.crypto || !window.crypto.subtle) return 'nosubtle:' + str; // 구형 환경 대비 fallback
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ---------------- 벨소리 / 진동 ----------------
+// 브라우저는 폰의 무음/진동 시스템 설정을 직접 읽을 수 없어 완전히 동일하게 맞출 수는 없지만,
+// iOS는 보통 무음 스위치가 켜져 있으면 이런 자동 알림음 재생을 브라우저가 막아주는 경향이 있어
+// 어느 정도 자연스럽게 무음 모드를 따라간다. 진동은 Android Chrome에서만 동작한다 (iOS 미지원).
+let audioCtx = null;
+let ringIntervalId = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* ignore */ }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+function playRingTone() {
+  if (!audioCtx) return;
+  [880, 660].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const startAt = audioCtx.currentTime + i * 0.28;
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.28, startAt + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + 0.3);
+  });
+}
+
+function startRinging() {
+  stopRinging();
+  ensureAudioCtx();
+  playRingTone();
+  ringIntervalId = setInterval(playRingTone, 1800);
+  if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+}
+
+function stopRinging() {
+  if (ringIntervalId) { clearInterval(ringIntervalId); ringIntervalId = null; }
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// ---------------- 백그라운드 알림 (앱은 켜둔 채로 다른 화면을 보고 있을 때) ----------------
+// 앱을 완전히 종료한 상태에서의 알림(카카오톡처럼)은 별도 푸시 서버가 필요해 이 방식으로는 지원하지 않음
+function ensureNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+function showBackgroundNotification(title, body) {
+  if (!document.hidden) return; // 화면을 보고 있으면 화면 안에서 이미 바로 보이므로 시스템 알림은 생략
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(title, { body, icon: './icon-192.png', tag: 'wm-' + Date.now() });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch (e) { /* ignore */ }
+}
+
+function playNotifySound() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const t = audioCtx.currentTime;
+  osc.type = 'sine';
+  osc.frequency.value = 740;
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.25);
+}
+
+// STUN만으로는 회사망/이동통신망 등 까다로운 NAT를 못 뚫는 경우가 많아
+// 무료 공용 TURN 서버(openrelay.metered.ca)를 함께 등록해 연결 성공률을 높임
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  ],
+};
+const CONNECT_TIMEOUT_MS = 12000;
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---------------- 로그인 / 방 입장 ----------------
+connectBtn.addEventListener('click', joinRoom);
+nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+
+function joinRoom() {
+  const room = roomInput.value.trim();
+  const nick = nickInput.value.trim();
+  if (!room || !nick) {
+    loginError.textContent = '방 이름과 닉네임을 모두 입력하세요.';
+    return;
+  }
+  loginError.textContent = '';
+  roomName = room;
+  myNick = nick;
+  myRoomPassword = pwInput.value; // 방장이면 이 값이 방의 비밀번호가 되고, 참가자면 검증에 사용됨
+  ensureAudioCtx(); // 버튼 클릭(사용자 동작) 시점에 미리 만들어둬야 나중에 벨소리 재생이 막히지 않음
+  ensureNotificationPermission(); // 마찬가지로 사용자 클릭 시점에 알림 권한을 미리 요청해둠
+  connectBtn.disabled = true;
+  attemptBecomeHost();
+}
+
+async function attemptBecomeHost(retryDelayMs) {
+  statusLine.textContent = '방 연결 확인 중...';
+  const hId = hostIdFor(roomName);
+  const p = new Peer(hId, { debug: 1, config: ICE_CONFIG });
+
+  let settled = false;
+
+  p.on('open', async () => {
+    if (settled) return;
+    settled = true;
+    peer = p;
+    myPeerId = hId;
+    isHost = true;
+    hostPasswordHash = myRoomPassword ? await hashText(myRoomPassword) : null;
+    onlineUsers = new Map([[myPeerId, myNick]]);
+    setupHostHandlers();
+    setupCommonPeerHandlers();
+    enterMain();
+  });
+
+  p.on('error', (err) => {
+    if (settled) return;
+    if (err.type === 'unavailable-id') {
+      settled = true;
+      p.destroy();
+      // 이미 방장이 있으므로 일반 참가자로 접속 시도
+      joinAsClient(hId);
+    } else {
+      settled = true;
+      statusLine.textContent = '';
+      loginError.textContent = '연결 실패: ' + err.type + ' (네트워크/방화벽을 확인하세요)';
+      connectBtn.disabled = false;
+    }
+  });
+}
+
+function joinAsClient(hId) {
+  statusLine.textContent = '방장에게 접속 중...';
+  const myId = randomClientId(roomName, myNick);
+  const p = new Peer(myId, { debug: 1, config: ICE_CONFIG });
+  let settled = false;
+
+  const timeoutId = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    statusLine.textContent = '';
+    loginError.textContent = '방장과 연결이 안 됩니다. 네트워크(방화벽/공용 와이파이) 문제일 수 있어요. 다시 시도해주세요.';
+    connectBtn.disabled = false;
+    try { p.destroy(); } catch (e) {}
+  }, CONNECT_TIMEOUT_MS);
+
+  p.on('open', () => {
+    peer = p;
+    myPeerId = myId;
+    isHost = false;
+    onlineUsers = new Map();
+    setupCommonPeerHandlers();
+
+    const conn = p.connect(hId, { reliable: true });
+    hostConn = conn;
+    conn.on('open', async () => {
+      const pwHash = myRoomPassword ? await hashText(myRoomPassword) : null;
+      conn.send({ type: 'join', nick: myNick, pwHash });
+      statusLine.textContent = '비밀번호 확인 중...';
+      // 입장 허용 여부는 handleClientData의 join-ok / join-rejected 로 결정됨
+    });
+    conn.on('data', (msg) => {
+      if (msg.type === 'join-ok') {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        enterMain();
+        return;
+      }
+      if (msg.type === 'join-rejected') {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        statusLine.textContent = '';
+        loginError.textContent = msg.reason || '입장이 거부되었습니다.';
+        connectBtn.disabled = false;
+        try { conn.close(); } catch (e) {}
+        try { p.destroy(); } catch (e) {}
+        peer = null;
+        hostConn = null;
+        return;
+      }
+      handleClientData(msg);
+    });
+    conn.on('close', onHostLost);
+    conn.on('error', onHostLost);
+  });
+
+  p.on('error', (err) => {
+    // 호스트가 방금 사라졌거나 접속 실패 -> 방장 승격 재시도
+    console.warn('client peer error', err);
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeoutId);
+    if (!mainScreen.classList.contains('hidden')) return; // 이미 입장한 상태면 무시
+    loginError.textContent = '접속 실패, 다시 시도합니다...';
+    setTimeout(() => attemptBecomeHost(), 800 + Math.random() * 800);
+  });
+}
+
+function enterMain() {
+  loginScreen.classList.add('hidden');
+  mainScreen.classList.remove('hidden');
+  myNickEl.textContent = myNick;
+  roleTag.textContent = isHost ? '(방장)' : '';
+  roomTag.textContent = '방: ' + roomName + (isHost ? (hostPasswordHash ? ' 🔒' : '') : '');
+  renderUserList();
+  appendSystem(isHost ? '방을 새로 만들었습니다.' : '방에 입장했습니다.', nowStr());
+}
+
+// ---------------- 공통 Peer 이벤트 (통화 수신 등) ----------------
+function setupCommonPeerHandlers() {
+  peer.on('call', (call) => {
+    if (currentCall || incomingCall) {
+      call.close(); // 이미 통화 중이면 자동 거절
+      return;
+    }
+    incomingCall = call;
+    const fromNick = onlineUsers.get(call.peer) || call.peer;
+    incomingCallText.textContent = `${fromNick}님이 화상통화를 겁니다`;
+    incomingCallModal.classList.remove('hidden');
+    startRinging();
+    showBackgroundNotification('📹 화상통화', `${fromNick}님이 전화를 겁니다`);
+
+    call.on('close', () => {
+      if (incomingCall === call) {
+        stopRinging();
+        incomingCallModal.classList.add('hidden');
+        incomingCall = null;
+      }
+    });
+  });
+
+  peer.on('disconnected', () => {
+    appendSystem('서버와의 연결이 불안정합니다. 재연결 시도 중...', nowStr());
+    peer.reconnect();
+  });
+}
+
+// ---------------- 방장 로직 (채팅 중계) ----------------
+function setupHostHandlers() {
+  peer.on('connection', (conn) => {
+    conn.on('open', () => {
+      conn.on('data', (msg) => handleHostData(conn, msg));
+      conn.on('close', () => {
+        const info = clientConns.get(conn.peer);
+        clientConns.delete(conn.peer);
+        onlineUsers.delete(conn.peer);
+        if (info) {
+          broadcastFromHost({ type: 'system', text: `${info.nick}님이 퇴장했습니다.`, time: nowStr() });
+          appendSystem(`${info.nick}님이 퇴장했습니다.`, nowStr());
+        }
+        broadcastUserListFromHost();
+      });
+    });
+  });
+}
+
+function handleHostData(conn, msg) {
+  if (msg.type === 'join') {
+    if (hostPasswordHash && msg.pwHash !== hostPasswordHash) {
+      conn.send({ type: 'join-rejected', reason: '비밀번호가 일치하지 않습니다.' });
+      setTimeout(() => { try { conn.close(); } catch (e) {} }, 300);
+      return;
+    }
+    clientConns.set(conn.peer, { conn, nick: msg.nick });
+    onlineUsers.set(conn.peer, msg.nick);
+    conn.send({ type: 'join-ok' });
+    broadcastFromHost({ type: 'system', text: `${msg.nick}님이 입장했습니다.`, time: nowStr() }, conn.peer);
+    appendSystem(`${msg.nick}님이 입장했습니다.`, nowStr());
+    broadcastUserListFromHost();
+  } else if (msg.type === 'chat') {
+    const out = { type: 'chat', kind: msg.kind, from: msg.from, peerId: conn.peer, text: msg.text, filename: msg.filename, mime: msg.mime, data: msg.data, time: nowStr() };
+    broadcastFromHost(out, conn.peer);
+    renderChatMessage(out);
+  }
+}
+
+function broadcastFromHost(payload, exceptPeerId) {
+  for (const [pid, info] of clientConns.entries()) {
+    if (pid === exceptPeerId) continue;
+    try { info.conn.send(payload); } catch (e) { /* ignore */ }
+  }
+}
+
+function broadcastUserListFromHost() {
+  onlineUsers.set(myPeerId, myNick); // 방장 자신 포함
+  const users = [...onlineUsers.entries()].map(([peerId, nick]) => ({ peerId, nick }));
+  broadcastFromHost({ type: 'userlist', users });
+  renderUserList();
+}
+
+// ---------------- 클라이언트 로직 ----------------
+function handleClientData(msg) {
+  if (msg.type === 'userlist') {
+    onlineUsers = new Map(msg.users.map((u) => [u.peerId, u.nick]));
+    renderUserList();
+  } else if (msg.type === 'system') {
+    appendSystem(msg.text, msg.time);
+  } else if (msg.type === 'chat') {
+    renderChatMessage(msg);
+  }
+}
+
+function onHostLost() {
+  if (hostConn === null) return; // 이미 처리됨
+  hostConn = null;
+  appendSystem('방장과의 연결이 끊어졌습니다. 새 방장 선출을 시도합니다...', nowStr());
+  setTimeout(() => {
+    if (peer) { peer.destroy(); peer = null; }
+    attemptBecomeHost();
+  }, 500 + Math.random() * 1000);
+}
+
+// ---------------- 접속자 목록 렌더링 ----------------
+function renderUserList() {
+  userStrip.innerHTML = '';
+  for (const [peerId, nick] of onlineUsers.entries()) {
+    if (peerId === myPeerId) continue;
+    const chip = document.createElement('div');
+    chip.className = 'user-chip';
+    chip.innerHTML = `<span class="dot"></span><span>${escapeHtml(nick)}</span>`;
+    const callBtn = document.createElement('button');
+    callBtn.textContent = '📹';
+    callBtn.title = `${nick}에게 화상통화 걸기`;
+    callBtn.addEventListener('click', () => startCall(peerId, nick));
+    chip.appendChild(callBtn);
+    userStrip.appendChild(chip);
+  }
+}
+
+// ---------------- 채팅 전송 ----------------
+sendBtn.addEventListener('click', sendText);
+msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendText(); });
+
+function sendText() {
+  const text = msgInput.value.trim();
+  if (!text) return;
+  sendChatPayload({ kind: 'text', text });
+  msgInput.value = '';
+}
+
+imageInput.addEventListener('change', () => handleFileSelect(imageInput, 'image'));
+fileInput.addEventListener('change', () => handleFileSelect(fileInput, 'file'));
+
+function handleFileSelect(input, kind) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  const MAX = 25 * 1024 * 1024;
+  if (file.size > MAX) { alert('파일이 너무 큽니다 (최대 25MB).'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(',')[1];
+    sendChatPayload({ kind, filename: file.name, mime: file.type, data: base64 });
+  };
+  reader.readAsDataURL(file);
+}
+
+function sendChatPayload(partial) {
+  const msg = { type: 'chat', from: myNick, peerId: myPeerId, time: nowStr(), ...partial };
+  if (isHost) {
+    broadcastFromHost(msg);
+    renderChatMessage(msg);
+  } else if (hostConn) {
+    hostConn.send(msg);
+    renderChatMessage(msg); // 낙관적 렌더링 (내 화면엔 바로 표시)
+  } else {
+    alert('아직 방에 연결되지 않았습니다.');
+  }
+}
+
+// ---------------- 채팅 로그 렌더링 ----------------
+function appendSystem(text) {
+  const div = document.createElement('div');
+  div.className = 'system-msg';
+  div.textContent = text;
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function makeRow(isMe, senderName) {
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMe ? 'me' : 'other'}`;
+  if (!isMe) {
+    const sender = document.createElement('div');
+    sender.className = 'msg-sender';
+    sender.textContent = senderName;
+    row.appendChild(sender);
+  }
+  return row;
+}
+
+function appendTime(row, time) {
+  if (!time) return;
+  const t = document.createElement('div');
+  t.className = 'msg-time';
+  t.textContent = time;
+  row.appendChild(t);
+}
+
+function renderChatMessage(msg) {
+  const isMe = msg.peerId === myPeerId;
+  const row = makeRow(isMe, msg.from);
+  if (msg.kind === 'text') {
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = msg.text;
+    row.appendChild(bubble);
+  } else if (msg.kind === 'image') {
+    const img = document.createElement('img');
+    img.className = 'msg-img';
+    img.src = `data:${msg.mime || 'image/png'};base64,${msg.data}`;
+    img.addEventListener('click', () => window.open(img.src, '_blank'));
+    row.appendChild(img);
+  } else if (msg.kind === 'file') {
+    const box = document.createElement('div');
+    box.className = 'msg-file';
+    const sizeKb = msg.data ? Math.round((msg.data.length * 0.75) / 1024) : 0;
+    box.innerHTML = `📎 <span>${escapeHtml(msg.filename)} (${sizeKb}KB)</span>`;
+    box.addEventListener('click', () => downloadBase64(msg.data, msg.filename, msg.mime));
+    row.appendChild(box);
+  }
+  appendTime(row, msg.time);
+  chatLog.appendChild(row);
+  scrollToBottom();
+
+  if (!isMe) {
+    if (document.hidden) {
+      playNotifySound();
+      if (navigator.vibrate) navigator.vibrate(150);
+      const preview = msg.kind === 'text' ? msg.text : msg.kind === 'image' ? '사진을 보냈습니다' : `파일: ${msg.filename}`;
+      showBackgroundNotification(msg.from, preview);
+    }
+  }
+}
+
+function downloadBase64(base64, filename, mime) {
+  const link = document.createElement('a');
+  link.href = `data:${mime || 'application/octet-stream'};base64,${base64}`;
+  link.download = filename || 'download';
+  link.click();
+}
+
+function scrollToBottom() { chatLog.scrollTop = chatLog.scrollHeight; }
+
+// ================================================================
+// 화상통화 (WebRTC, PeerJS media call - 방장 경유하지 않고 직접 P2P)
+// ================================================================
+async function startCall(peerId, nick) {
+  if (currentCall) { alert('이미 통화 중입니다.'); return; }
+  currentPeerName = nick;
+  callingText.textContent = `${nick}님에게 거는 중...`;
+  callingModal.classList.remove('hidden');
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  } catch (e) {
+    callingModal.classList.add('hidden');
+    alert('카메라/마이크를 사용할 수 없습니다: ' + e.message);
+    return;
+  }
+  const call = peer.call(peerId, localStream);
+  currentCall = call;
+  call.on('stream', (remoteStream) => {
+    callingModal.classList.add('hidden');
+    remoteVideo.srcObject = remoteStream;
+    showCallScreen();
+  });
+  call.on('close', endCallLocal);
+  call.on('error', endCallLocal);
+}
+
+cancelCallBtn.addEventListener('click', () => {
+  if (currentCall) currentCall.close();
+  endCallLocal();
+});
+
+acceptCallBtn.addEventListener('click', async () => {
+  stopRinging();
+  incomingCallModal.classList.add('hidden');
+  if (!incomingCall) return;
+  const call = incomingCall;
+  incomingCall = null;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  } catch (e) {
+    alert('카메라/마이크를 사용할 수 없습니다: ' + e.message);
+    call.close();
+    return;
+  }
+  currentCall = call;
+  currentPeerName = onlineUsers.get(call.peer) || call.peer;
+  call.answer(localStream);
+  call.on('stream', (remoteStream) => {
+    remoteVideo.srcObject = remoteStream;
+    showCallScreen();
+  });
+  call.on('close', endCallLocal);
+  call.on('error', endCallLocal);
+});
+
+rejectCallBtn.addEventListener('click', () => {
+  stopRinging();
+  incomingCallModal.classList.add('hidden');
+  if (incomingCall) incomingCall.close();
+  incomingCall = null;
+});
+
+hangupBtn.addEventListener('click', () => {
+  if (currentCall) currentCall.close();
+  endCallLocal();
+});
+
+function endCallLocal() {
+  stopRinging();
+  if (currentCall) { try { currentCall.close(); } catch (e) {} currentCall = null; }
+  if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
+  currentPeerName = null;
+  if (document.pictureInPictureElement) { document.exitPictureInPicture().catch(() => {}); }
+  remoteVideo.srcObject = null;
+  localVideo.srcObject = null;
+  callingModal.classList.add('hidden');
+  incomingCallModal.classList.add('hidden');
+  callScreen.classList.add('hidden');
+  callScreen.classList.remove('swapped');
+  isVideoSwapped = false;
+  micOn = true; camOn = true;
+  toggleMicBtn.classList.remove('off');
+  toggleCamBtn.classList.remove('off');
+}
+
+function showCallScreen() {
+  callScreen.classList.remove('hidden');
+  callScreen.classList.remove('swapped');
+  localVideo.srcObject = localStream;
+  updateAutoPipTarget();
+}
+
+let isVideoSwapped = false;
+function toggleVideoSwap() {
+  isVideoSwapped = !isVideoSwapped;
+  callScreen.classList.toggle('swapped', isVideoSwapped);
+  updateAutoPipTarget();
+}
+localVideo.addEventListener('click', toggleVideoSwap);
+remoteVideo.addEventListener('click', toggleVideoSwap);
+
+// ================================================================
+// PIP (화면 속 화면) - 통화 중 홈 화면/다른 앱으로 전환해도 영상이 작은 창으로 계속 보이게 함
+// 브라우저 제약상 "영상(video)"만 PIP로 띄울 수 있고, 채팅 등 앱 전체는 불가능함
+// ================================================================
+function updateAutoPipTarget() {
+  const mainVideo = isVideoSwapped ? localVideo : remoteVideo;
+  const pipSideVideo = isVideoSwapped ? remoteVideo : localVideo;
+  try { mainVideo.autoPictureInPicture = true; } catch (e) {}
+  try { pipSideVideo.autoPictureInPicture = false; } catch (e) {}
+}
+
+async function togglePip() {
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+      return;
+    }
+    const mainVideo = isVideoSwapped ? localVideo : remoteVideo;
+    if (!mainVideo.requestPictureInPicture) {
+      alert('이 브라우저는 PIP(화면 속 화면) 기능을 지원하지 않습니다.');
+      return;
+    }
+    await mainVideo.requestPictureInPicture();
+  } catch (e) {
+    console.warn('PIP 오류', e);
+    alert('PIP 모드를 시작할 수 없습니다: ' + e.message);
+  }
+}
+pipBtn.addEventListener('click', togglePip);
+
+// 홈 버튼/다른 앱 전환으로 탭이 백그라운드로 가면 통화 중일 때 자동으로 PIP 시도
+// (브라우저에 따라 사용자 클릭 없이는 거부될 수 있어 실패해도 조용히 무시함 - 이 경우 위 PIP 버튼을 미리 눌러두면 확실히 동작함)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !currentCall || document.pictureInPictureElement) return;
+  const mainVideo = isVideoSwapped ? localVideo : remoteVideo;
+  if (mainVideo.requestPictureInPicture) {
+    mainVideo.requestPictureInPicture().catch(() => { /* 자동 진입 불가 브라우저 - 무시 */ });
+  }
+});
+
+toggleMicBtn.addEventListener('click', () => {
+  if (!localStream) return;
+  micOn = !micOn;
+  localStream.getAudioTracks().forEach((t) => (t.enabled = micOn));
+  toggleMicBtn.classList.toggle('off', !micOn);
+});
+toggleCamBtn.addEventListener('click', () => {
+  if (!localStream) return;
+  camOn = !camOn;
+  localStream.getVideoTracks().forEach((t) => (t.enabled = camOn));
+  toggleCamBtn.classList.toggle('off', !camOn);
+});
+
+// ================================================================
+// 자리비움 자동 잠금
+// ================================================================
+let lockPinHash = null;
+let isLocked = false;
+let lastActivityTime = Date.now();
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분 동안 조작 없으면 자동 잠금 (필요시 이 값을 조절)
+
+function resetActivity() { lastActivityTime = Date.now(); }
+['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((evt) => {
+  document.addEventListener(evt, resetActivity, { passive: true });
+});
+
+setInterval(() => {
+  if (isLocked || !lockPinHash) return;
+  if (mainScreen.classList.contains('hidden')) return; // 아직 로그인 전
+  if (!callScreen.classList.contains('hidden')) { resetActivity(); return; } // 통화 중엔 잠그지 않음
+  if (Date.now() - lastActivityTime > IDLE_TIMEOUT_MS) showLockScreen();
+}, 10000);
+
+async function setupLockPinIfNeeded() {
+  if (lockPinHash) return true;
+  const pin = window.prompt('자리비움 시 화면을 잠글 PIN을 설정하세요 (4자 이상). 취소하면 잠금 기능을 사용하지 않습니다:');
+  if (!pin || pin.trim().length < 4) {
+    if (pin !== null) alert('PIN은 4자 이상 입력해주세요.');
+    return false;
+  }
+  lockPinHash = await hashText(pin.trim());
+  alert(`잠금 PIN이 설정되었습니다.\n이제 ${IDLE_TIMEOUT_MS / 60000}분 동안 조작이 없으면 자동으로 잠기고, 🔒 버튼으로 바로 잠글 수도 있습니다.`);
+  return true;
+}
+
+lockBtn.addEventListener('click', async () => {
+  const ready = lockPinHash ? true : await setupLockPinIfNeeded();
+  if (ready && lockPinHash) showLockScreen();
+});
+
+function showLockScreen() {
+  if (isLocked) return;
+  isLocked = true;
+  lockOverlay.classList.remove('hidden');
+  lockPinField.value = '';
+  lockError.textContent = '';
+  setTimeout(() => lockPinField.focus(), 50);
+}
+
+async function tryUnlock() {
+  const val = lockPinField.value.trim();
+  const h = await hashText(val);
+  if (h === lockPinHash) {
+    isLocked = false;
+    lockOverlay.classList.add('hidden');
+    resetActivity();
+  } else {
+    lockError.textContent = 'PIN이 일치하지 않습니다.';
+    lockPinField.value = '';
+    lockPinField.focus();
+  }
+}
+unlockBtn.addEventListener('click', tryUnlock);
+lockPinField.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+
+// ================================================================
+// 모바일 홈 화면 설치(PWA) 지원 - 실제 캐싱 없이 설치 조건만 충족시킴
+// ================================================================
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  const swCode = "self.addEventListener('fetch', function(){});";
+  const swBlobUrl = URL.createObjectURL(new Blob([swCode], { type: 'application/javascript' }));
+  navigator.serviceWorker.register(swBlobUrl).catch(() => {});
+}
+</script>
+</body>
+</html>
